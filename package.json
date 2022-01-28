@@ -1,0 +1,19 @@
+{
+  "name": "ssl-checker",
+  "version": "1.0.0",
+  "description": "SSL certificate checker.",
+  "main": "main.js",
+  "repository": "git@github.com:yi-ge/ssl-checker.git",
+  "author": "yi-ge <a@wyr.me>",
+  "license": "MIT",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "axios": "^0.25.0",
+    "fastify": "^3.27.0",
+    "fastify-basic-auth": "^2.2.0",
+    "node-schedule": "^2.1.0",
+    "qs": "^6.10.3"
+  }
+}
