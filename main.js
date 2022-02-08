@@ -171,7 +171,7 @@ schedule.scheduleJob('0 0 1 * *', function () { // 循环任务。 这里修改c
         console.log(host, valid_from, valid_to, days)
         if (days < 3) {
           console.log(await sendSMS(phoneList, {
-            host: host.substring(0, 15),
+            host: host.replace(/\./g, '-').substring(0, 15),
             day: days
           }))
         }
