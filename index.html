@@ -33,6 +33,7 @@
             <th>起效时间</th>
             <th>到期时间</th>
             <th>到期天数</th>
+            <th>通知手机号</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -85,21 +86,28 @@
           const lines = json.result.split('\n')
           let html = ''
           for (let n in lines) {
-            const line = lines[n]
-            if (line) {
+            let line = lines[n]
+            if (line.trim().includes('//')) {
+              line = line.split('//')[0]
+            }
+            if (line.trim()) {
               const [hostStr, phones] = line.split('|')
-              const phoneList = phones.split(',')
-              const [host, port] = hostStr.split(':')
-              const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
-              const item = `
-              <tr>
-                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                <td>${new Date(valid_from).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                <td>${new Date(valid_to).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                <td>${days}</td>
-              </tr>
-              `
-              html += item
+              if (hostStr.trim()) {
+                let phoneList = phones && phones.split ? phones.split(',') : []
+                const [host, port] = hostStr.trim().split(':')
+                const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
+                phoneList = phoneList.map(phone => phone.trim())
+                const item = `
+                <tr>
+                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                  <td>${new Date(valid_from).Format("yyyy-MM-dd HH:mm:ss")}</td>
+                  <td>${new Date(valid_to).Format("yyyy-MM-dd HH:mm:ss")}</td>
+                  <td>${days}</td>
+                  <td>${phoneList.join(', ')}</td>
+                </tr>
+                `
+                html += item
+              }
             }
           }
           document.getElementById('tbody').innerHTML = html

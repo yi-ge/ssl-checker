@@ -14,10 +14,12 @@ const sendSMS = async (phones, params) => { // TODO: 替换此内容为你的短
   const list = []
 
   phones.forEach(phone => {
-    list.push({
-      to: phone,
-      vars: params
-    })
+    if (phone.trim()) {
+      list.push({
+        to: phone.trim(),
+        vars: params
+      })
+    }
   })
 
   const body = qs.stringify({
@@ -162,13 +164,16 @@ fastify.after(() => {
 schedule.scheduleJob('0 0 1 * *', function () { // 循环任务。 这里修改cron风格的表达式
   const lines = fs.readFileSync(path.join(__dirname, 'config.txt'), 'utf8').split('\n')
   lines.forEach(async line => {
-    if (line) {
+    if (line.trim().includes('//')) {
+      line = line.split('//')[0]
+    }
+    if (line.trim()) {
       const [hostStr, phones] = line.split('|')
-      if (phones) {
-        const phoneList = phones.split(',')
+      if (hostStr.trim() && phones) {
+        const phoneList = phones && phones.split ? phones.split(',') : []
         const [host, port] = hostStr.split(':')
         const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
-        console.log(host, valid_from, valid_to, days)
+        // console.log(host, valid_from, valid_to, days)
         if (days < 3) {
           console.log(await sendSMS(phoneList, {
             host: host.replace(/\./g, '-').substring(0, 15),
