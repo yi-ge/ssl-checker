@@ -102,3 +102,9 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Test
+sendSMS-test-submail.js
+sendSMS-test-tencent.js
+test-data.json
+test.js

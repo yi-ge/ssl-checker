@@ -95,20 +95,49 @@
               if (hostStr.trim()) {
                 let phoneList = phones && phones.split ? phones.split(',') : []
                 const [host, port] = hostStr.trim().split(':')
-                const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
-                phoneList = phoneList.map(phone => phone.trim())
-                const item = `
-                <tr>
-                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                  <td>${new Date(valid_from).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                  <td>${new Date(valid_to).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                  <td>${days}</td>
-                  <td>${phoneList.join(', ')}</td>
-                </tr>
-                `
-                html += item
+                try {
+                  const { code, msg, result } = await checkerSSLCertificate(host, port)
+                  phoneList = phoneList.map(phone => phone.trim())
+                  if (code === 1) {
+                    const { valid_from, valid_to, days } = result
+                    const item = `
+                    <tr>
+                      <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                      <td>${new Date(valid_from).Format("yyyy-MM-dd HH:mm:ss")}</td>
+                      <td>${new Date(valid_to).Format("yyyy-MM-dd HH:mm:ss")}</td>
+                      <td>${days}</td>
+                      <td>${phoneList.join(', ')}</td>
+                    </tr>
+                    `
+                    html += item
+                  } else {
+                    const item = `
+                    <tr>
+                      <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                      <td>请求失败：</td>
+                      <td>${msg}</td>
+                      <td> - </td>
+                      <td>${phoneList.join(', ')}</td>
+                    </tr>
+                    `
+                    html += item
+                  }
+                } catch (err) {
+                  console.error(err)
+                  const item = `
+                  <tr>
+                    <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                    <td>请求失败：</td>
+                    <td>网络错误</td>
+                    <td> - </td>
+                    <td>${phoneList.join(', ')}</td>
+                  </tr>
+                  `
+                  html += item
+                }
               }
             }
+            document.getElementById('tbody').innerHTML = html
           }
           document.getElementById('tbody').innerHTML = html
         } else alert('获取配置数据失败:', json.msg)

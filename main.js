@@ -1,70 +1,10 @@
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
-const qs = require('qs')
-const axios = require('axios')
 const fastify = require('fastify')({ logger: true })
+const sendSMS = require('./sendSMS')
 
 const schedule = require('node-schedule')
-
-const sendSMS = async (phones, params) => { // TODO: 替换此内容为你的短信发送提供商内容即可
-  const templateId = ''
-  const appid = ''
-  const appkey = ''
-  const list = []
-
-  phones.forEach(phone => {
-    if (phone.trim()) {
-      list.push({
-        to: phone.trim(),
-        vars: params
-      })
-    }
-  })
-
-  const body = qs.stringify({
-    appid,
-    project: templateId,
-    multi: JSON.stringify(list),
-    signature: appkey
-  })
-
-  const {
-    data
-  } = await axios({
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-    },
-    method: 'POST',
-    url: 'xxx',
-    data: body,
-  })
-
-  if (data !== undefined) {
-    for (const n in data) {
-      if (data[n].status === 'success') data[n].code = 1
-      if (data[n].to) data[n].mobile = data[n].to
-      if (data[n].sms_credits) delete data[n].sms_credits
-    }
-
-    // 参数         必选 类型   描述
-    // code         是 number 错误码，1表示成功（计费依据），非1表示失败
-    // msg          否 string 错误消息，status 非1时的具体错误信息
-    // fee          是 number 短信计费的条数，计费规则请参考具体运营商
-    // mobile       是 string 手机号码
-    // nationCode   否 string 国家（或地区）码
-    // send_id      否 string 本次发送标识 ID，标识一次短信下发记录
-
-    return {
-      code: 1,
-      result: data
-    }
-  } else {
-    return {
-      code: -1
-    } // 收到未知错误
-  }
-}
 
 async function checkerSSLCertificate (host, port = 443) {
   return new Promise((resolve, reject) => {
@@ -78,8 +18,10 @@ async function checkerSSLCertificate (host, port = 443) {
       method: 'GET',
       rejectUnauthorized: false,
       agent: new https.Agent({
-        maxCachedSessions: 0
+        maxCachedSessions: 0,
+        timeout: 1000
       }),
+      timeout: 1000,
     }, function (res) {
       const certificateInfo = res.socket.getPeerCertificate()
 
@@ -115,7 +57,14 @@ async function checkerSSLCertificate (host, port = 443) {
       })
     })
 
-    req.on('error', err => reject(err))
+    req.on('timeout', () => {
+      req.destroy();
+    });
+
+    req.on('error', err => {
+      console.log(err)
+      reject(err)
+    })
     req.end()
   })
 }
@@ -154,10 +103,16 @@ fastify.after(() => {
   })
 
   fastify.get('/api/checkerSSLCertificate', async (req, reply) => {
-    const res = await checkerSSLCertificate(req.query.host, req.query.port).catch(err => {
-      reply.send({ code: -1, msg: err.message })
-    })
-    return res
+    try {
+      const result = await checkerSSLCertificate(req.query.host, req.query.port)
+      return {
+        code: 1,
+        msg: 'ok',
+        result
+      }
+    } catch (err) {
+      return { code: -1, msg: err.toString() }
+    }
   })
 })
 
@@ -172,13 +127,17 @@ schedule.scheduleJob('0 0 1 * *', function () { // 循环任务。 这里修改c
       if (hostStr.trim() && phones) {
         const phoneList = phones && phones.split ? phones.split(',') : []
         const [host, port] = hostStr.split(':')
-        const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
-        // console.log(host, valid_from, valid_to, days)
-        if (days < 3) {
-          console.log(await sendSMS(phoneList, {
-            host: host.replace(/\./g, '-').substring(0, 15),
-            day: days
-          }))
+        try {
+          const { valid_from, valid_to, days } = await checkerSSLCertificate(host, port)
+          // console.log(host, valid_from, valid_to, days)
+          if (days < 3) {
+            console.log(await sendSMS(phoneList, {
+              host: host.replace(/\./g, '-').substring(0, 15),
+              day: days
+            }))
+          }
+        } catch (err) {
+          console.error(err)
         }
       }
     }
