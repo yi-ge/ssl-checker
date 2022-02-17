@@ -116,7 +116,7 @@ fastify.after(() => {
   })
 })
 
-schedule.scheduleJob('0 0 1 * *', function () { // 循环任务。 这里修改cron风格的表达式
+schedule.scheduleJob('0 0 * * *', function () { // 循环任务。 这里修改cron风格的表达式
   const lines = fs.readFileSync(path.join(__dirname, 'config.txt'), 'utf8').split('\n')
   lines.forEach(async line => {
     if (line.trim().includes('//')) {
