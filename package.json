@@ -1,6 +1,6 @@
 {
   "name": "ssl-checker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SSL certificate checker.",
   "main": "main.js",
   "repository": "git@github.com:yi-ge/ssl-checker.git",
