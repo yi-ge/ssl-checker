@@ -69,7 +69,7 @@ async function checkerSSLCertificate (host, port = 443) {
   })
 }
 
-fastify.register(require('fastify-basic-auth'), {
+fastify.register(require('@fastify/basic-auth'), {
   validate: (username, password, req, reply, done) => {
     if (username === 'admin' && password === 'admin') done() // TODO: 在这里修改用户名和密码
     else done(new Error('Winter is coming'))
@@ -146,7 +146,10 @@ schedule.scheduleJob('0 0 * * *', function () { // 循环任务。 这里修改c
 
 const start = async () => {
   try {
-    await fastify.listen(9000, '0.0.0.0')
+    await fastify.listen({
+      port: 9000,
+      host: '0.0.0.0'
+    })
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)
