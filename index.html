@@ -16,7 +16,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 1200px;
       margin: auto;
       text-align: center;
     }
@@ -90,6 +90,34 @@
       margin-bottom: 10px;
       font-weight: bold;
     }
+    .progress-container {
+      width: 100%;
+      background-color: #e5e5e5;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .progress-bar {
+      width: 0;
+      height: 8px;
+      background-color: #007bff;
+      transition: width 0.3s ease;
+    }
+    .loading:after {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #ccc;
+      border-top-color: #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 5px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
   </style>
 </head>
 
@@ -98,7 +126,8 @@
     <button type="button" class="btn" id="save">保存</button>
     <input type="text" id="testPhone" class="text-input" placeholder="测试手机号，多个用逗号分隔" />
     <button type="button" class="btn" id="sendTestSMS">发送测试短信</button>
-    <p id="progress"></p>
+      <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+      <p id="progressText"></p>
     <textarea id="config" placeholder="每行格式：域名[:端口]|手机号1,手机号2"></textarea>
     <div>
       <table>
@@ -151,24 +180,25 @@
       })
     }
 
+
     const getConfig = () => {
       fetch('/api/config', {
         method: 'GET',
-      }).then(response => response.json()).then(async json => {
+      }).then(response => response.json()).then(json => {
         if (json.code !== 1) {
-          alert('获取配置数据失败:', json.msg)
+          alert('获取配置数据失败:' + json.msg)
           return
         }
 
         document.getElementById('config').value = json.result
         const lines = json.result.split('\n')
-        const progressEl = document.getElementById('progress')
-
-        const tasks = []
+        const progressText = document.getElementById('progressText')
+        const progressBar = document.getElementById('progressBar')
+        const tbody = document.getElementById('tbody')
+        tbody.innerHTML = ''
         let total = 0
         let finished = 0
-
-        progressEl.textContent = '检测进度：0/0'
+        const domains = []
 
         for (const lineRaw of lines) {
           let line = lineRaw
@@ -183,69 +213,66 @@
           const phoneList = phones && phones.split ? phones.split(',').map(p => p.trim()) : []
           const [host, port] = hostStr.trim().split(':')
           total++
-          tasks.push((async () => {
-            let item = ''
-            try {
-              const { code, msg, result } = await checkerSSLCertificate(host, port)
-              if (code === 1) {
-                const { valid_from, valid_to, days } = result
-                item = `
-                <tr>
-                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                  <td>${new Date(valid_from).Format('yyyy-MM-dd HH:mm:ss')}</td>
-                  <td>${new Date(valid_to).Format('yyyy-MM-dd HH:mm:ss')}</td>
-                  <td>${days}</td>
-                  <td>${phoneList.join(', ')}</td>
-                </tr>
-                `
-              } else {
-                item = `
-                <tr>
-                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                  <td>请求失败：</td>
-                  <td>${msg}</td>
-                  <td> - </td>
-                  <td>${phoneList.join(', ')}</td>
-                </tr>
-                `
-              }
-            } catch (err) {
-              console.error(err)
-              item = `
-              <tr>
-                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                <td>请求失败：</td>
-                <td>网络错误</td>
-                <td> - </td>
-                <td>${phoneList.join(', ')}</td>
-              </tr>
-              `
-            } finally {
-              finished++
-              progressEl.textContent = `检测进度：${finished}/${total}`
-            }
-            return item
-          })())
+          const rowId = 'row-' + total
+          const tr = document.createElement('tr')
+          tr.id = rowId
+          tr.innerHTML = `
+            <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+            <td colspan="3"><span class="loading">检测中</span></td>
+            <td>${phoneList.join(', ')}</td>
+          `
+          tbody.appendChild(tr)
+          domains.push({ host, port, phoneList, rowId })
         }
 
         if (total === 0) {
-          progressEl.textContent = '未检测到域名'
-        } else {
-          progressEl.textContent = `检测进度：0/${total}`
+          progressText.textContent = '未检测到域名'
+          return
         }
 
-        const results = await Promise.all(tasks)
-        let html = results.join('')
-        if (!html) {
-          html = '<tr><td colspan="5">暂无数据</td></tr>'
+        progressText.textContent = `检测进度：0/${total}`
+
+        const updateProgress = () => {
+          finished++
+          progressText.textContent = `检测进度：${finished}/${total}`
+          progressBar.style.width = (finished / total * 100) + '%'
+          if (finished === total) {
+            progressText.textContent = '检测完成'
+          }
         }
-        document.getElementById('tbody').innerHTML = html
-        if (total > 0) {
-          progressEl.textContent = '检测完成'
-        }
+
+        domains.forEach(({ host, port, phoneList, rowId }) => {
+          checkerSSLCertificate(host, port).then(({ code, msg, result }) => {
+            const tr = document.getElementById(rowId)
+            if (code === 1) {
+              const { valid_from, valid_to, days } = result
+              tr.innerHTML = `
+                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                <td>${new Date(valid_from).Format('yyyy-MM-dd HH:mm:ss')}</td>
+                <td>${new Date(valid_to).Format('yyyy-MM-dd HH:mm:ss')}</td>
+                <td>${days}</td>
+                <td>${phoneList.join(', ')}</td>
+              `
+            } else {
+              tr.innerHTML = `
+                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                <td colspan="2">请求失败：${msg}</td>
+                <td> - </td>
+                <td>${phoneList.join(', ')}</td>
+              `
+            }
+          }).catch(err => {
+            const tr = document.getElementById(rowId)
+            tr.innerHTML = `
+              <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+              <td colspan="2">请求失败：网络错误</td>
+              <td> - </td>
+              <td>${phoneList.join(', ')}</td>
+            `
+          }).finally(updateProgress)
+        })
       })
     }
-
     const setConfig = () => {
       fetch("/api/config", {
         method: "POST",
