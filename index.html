@@ -75,12 +75,18 @@
     button.btn:hover {
       background-color: #0056b3;
     }
+
+    #progress {
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
     <button type="button" class="btn" id="save">保存</button>
+    <p id="progress"></p>
     <textarea id="config" placeholder="每行格式：域名[:端口]|手机号1,手机号2"></textarea>
     <div>
       <table>
@@ -134,72 +140,96 @@
     }
 
     const getConfig = () => {
-      fetch("/api/config", {
-        method: "GET",
-        // mode: 'cors',
+      fetch('/api/config', {
+        method: 'GET',
       }).then(response => response.json()).then(async json => {
-        if (json.code === 1) {
-          document.getElementById('config').value = json.result
-          const lines = json.result.split('\n')
-          let html = ''
-          for (let n in lines) {
-            let line = lines[n]
-            if (line.trim().includes('//')) {
-              line = line.split('//')[0]
-            }
-            if (line.trim()) {
-              const [hostStr, phones] = line.split('|')
-              if (hostStr.trim()) {
-                let phoneList = phones && phones.split ? phones.split(',') : []
-                const [host, port] = hostStr.trim().split(':')
-                try {
-                  const { code, msg, result } = await checkerSSLCertificate(host, port)
-                  phoneList = phoneList.map(phone => phone.trim())
-                  if (code === 1) {
-                    const { valid_from, valid_to, days } = result
-                    const item = `
-                    <tr>
-                      <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                      <td>${new Date(valid_from).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                      <td>${new Date(valid_to).Format("yyyy-MM-dd HH:mm:ss")}</td>
-                      <td>${days}</td>
-                      <td>${phoneList.join(', ')}</td>
-                    </tr>
-                    `
-                    html += item
-                  } else {
-                    const item = `
-                    <tr>
-                      <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                      <td>请求失败：</td>
-                      <td>${msg}</td>
-                      <td> - </td>
-                      <td>${phoneList.join(', ')}</td>
-                    </tr>
-                    `
-                    html += item
-                  }
-                } catch (err) {
-                  console.error(err)
-                  const item = `
-                  <tr>
-                    <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                    <td>请求失败：</td>
-                    <td>网络错误</td>
-                    <td> - </td>
-                    <td>${phoneList.join(', ')}</td>
-                  </tr>
-                  `
-                  html += item
-                }
+        if (json.code !== 1) {
+          alert('获取配置数据失败:', json.msg)
+          return
+        }
+
+        document.getElementById('config').value = json.result
+        const lines = json.result.split('\n')
+        const progressEl = document.getElementById('progress')
+
+        const tasks = []
+        let total = 0
+        let finished = 0
+        progressEl.textContent = '检测进度：0/0'
+
+        for (const lineRaw of lines) {
+          let line = lineRaw
+          if (line.trim().includes('//')) {
+            line = line.split('//')[0]
+          }
+          if (!line.trim()) continue
+
+          const [hostStr, phones] = line.split('|')
+          if (!hostStr || !hostStr.trim()) continue
+
+          const phoneList = phones && phones.split ? phones.split(',').map(p => p.trim()) : []
+          const [host, port] = hostStr.trim().split(':')
+          total++
+          tasks.push((async () => {
+            let item = ''
+            try {
+              const { code, msg, result } = await checkerSSLCertificate(host, port)
+              if (code === 1) {
+                const { valid_from, valid_to, days } = result
+                item = `
+                <tr>
+                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                  <td>${new Date(valid_from).Format('yyyy-MM-dd HH:mm:ss')}</td>
+                  <td>${new Date(valid_to).Format('yyyy-MM-dd HH:mm:ss')}</td>
+                  <td>${days}</td>
+                  <td>${phoneList.join(', ')}</td>
+                </tr>
+                `
+              } else {
+                item = `
+                <tr>
+                  <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                  <td>请求失败：</td>
+                  <td>${msg}</td>
+                  <td> - </td>
+                  <td>${phoneList.join(', ')}</td>
+                </tr>
+                `
               }
+            } catch (err) {
+              console.error(err)
+              item = `
+              <tr>
+                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+                <td>请求失败：</td>
+                <td>网络错误</td>
+                <td> - </td>
+                <td>${phoneList.join(', ')}</td>
+              </tr>
+              `
+            } finally {
+              finished++
+              progressEl.textContent = `检测进度：${finished}/${total}`
             }
-          }
-          if (!html) {
-            html = '<tr><td colspan="5">暂无数据</td></tr>'
-          }
-          document.getElementById('tbody').innerHTML = html
-        } else alert('获取配置数据失败:', json.msg)
+            return item
+          })())
+        }
+
+        if (total === 0) {
+          progressEl.textContent = '未检测到域名'
+        } else {
+          progressEl.textContent = `检测进度：0/${total}`
+        }
+
+        const results = await Promise.all(tasks)
+        let html = results.join('')
+        if (!html) {
+          html = '<tr><td colspan="5">暂无数据</td></tr>'
+        }
+        document.getElementById('tbody').innerHTML = html
+        if (total > 0) {
+          progressEl.textContent = '检测完成'
+        }
       })
     }
 
