@@ -156,6 +156,8 @@
         let total = 0
         let finished = 0
 
+        progressEl.textContent = '检测进度：0/0'
+
         for (const lineRaw of lines) {
           let line = lineRaw
           if (line.trim().includes('//')) {
@@ -214,13 +216,21 @@
           })())
         }
 
-        progressEl.textContent = `检测进度：0/${total}`
+        if (total === 0) {
+          progressEl.textContent = '未检测到域名'
+        } else {
+          progressEl.textContent = `检测进度：0/${total}`
+        }
+
         const results = await Promise.all(tasks)
         let html = results.join('')
         if (!html) {
           html = '<tr><td colspan="5">暂无数据</td></tr>'
         }
         document.getElementById('tbody').innerHTML = html
+        if (total > 0) {
+          progressEl.textContent = '检测完成'
+        }
       })
     }
 
