@@ -98,6 +98,9 @@ fastify.get('/api/config', (req, reply) => {
 
 相比之下普通服务器部署会省事一些。
 
+## 文档
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+
 ## 相关博文
 
 SSL 证书过期监测，博文：[https://www.wyr.me/post/691](https://www.wyr.me/post/691)
