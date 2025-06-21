@@ -10,6 +10,7 @@
   - `/` – 返回 `index.html`
   - `/api/config` – 获取或更新 `config.txt` 内容
   - `/api/checkerSSLCertificate` – 查询指定域名和端口的证书信息
+  - `/api/testSMS` – 发送测试短信，验证短信接口配置（支持 `POST`/`GET`）
 - 使用 **node-schedule** 每日检查 `config.txt` 中的域名
 - 通过 Node 的 `https` 模块获取证书并缓存到 `ssl_cache.json`
 - 当证书距离过期不足三天时，触发 `sendSMS()` 发送提醒

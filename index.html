@@ -86,6 +86,8 @@
 <body>
   <div class="container">
     <button type="button" class="btn" id="save">保存</button>
+    <input type="text" id="test-phone" placeholder="测试手机号，多号逗号分隔" style="margin-left:10px;padding:6px 8px;" />
+    <button type="button" class="btn" id="test">发送测试短信</button>
     <p id="progress"></p>
     <textarea id="config" placeholder="每行格式：域名[:端口]|手机号1,手机号2"></textarea>
     <div>
@@ -252,8 +254,28 @@
       })
     }
 
+    const sendTestSMS = () => {
+      const phones = document.getElementById('test-phone').value
+      fetch('/api/testSMS', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ phones })
+      }).then(response => response.json()).then(json => {
+        if (json.code === 1) {
+          alert('发送成功')
+        } else {
+          alert('发送失败: ' + json.msg)
+        }
+      }).catch(() => {
+        alert('网络异常')
+      })
+    }
+
     window.onload = function () {
       document.getElementById('save').onclick = setConfig
+      document.getElementById('test').onclick = sendTestSMS
       getConfig()
     }
   </script>

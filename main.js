@@ -188,6 +188,33 @@ fastify.after(() => {
       return { code: -1, msg: err.message }
     }
   })
+
+  // 发送测试短信，用于验证短信接口配置是否可用
+  fastify.route({
+    method: ['POST', 'GET'],
+    url: '/api/testSMS',
+    handler: async (req, reply) => {
+      try {
+        const phonesRaw = (req.body && req.body.phones) || req.query.phones
+        if (!phonesRaw) {
+          return { code: -2, msg: '手机号不能为空' }
+        }
+
+        const phoneList = Array.isArray(phonesRaw)
+          ? phonesRaw
+          : phonesRaw.split(',').map(p => p.trim()).filter(p => p)
+
+        if (phoneList.length === 0) {
+          return { code: -2, msg: '手机号不能为空' }
+        }
+
+        const result = await sendSMS(phoneList, { host: 'test', day: 0 })
+        return { code: 1, result }
+      } catch (err) {
+        return { code: -1, msg: err.message }
+      }
+    }
+  })
 })
 
 schedule.scheduleJob('0 0 * * *', async function () {
