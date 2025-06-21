@@ -7,140 +7,479 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SSL 证书过期监测 配置</title>
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-      background-color: #f9fafb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
       color: #333;
       line-height: 1.6;
-      padding: 40px 20px;
+      padding: 20px;
     }
 
     .container {
       max-width: 1200px;
-      margin: auto;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+      background-size: 300% 100%;
+      animation: gradient 3s ease infinite;
+    }
+
+    @keyframes gradient {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    .header {
       text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 1.1rem;
+    }
+
+    .control-panel {
+      background: #fff;
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button.btn {
+      padding: 12px 24px;
+      cursor: pointer;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      min-width: 120px;
+    }
+
+    button.btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    button.btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    button.btn:hover::before {
+      left: 100%;
+    }
+
+    button.btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    button.btn:active {
+      transform: translateY(0);
+    }
+
+    #save {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    #sendTestSMS {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+    }
+
+    input.text-input {
+      width: 100%;
+      margin-bottom: 25px;
+      border: 2px solid #e1e5e9;
+      border-radius: 12px;
+      padding: 15px 20px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      background: #fff;
+    }
+
+    input.text-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      transform: translateY(-1px);
     }
 
     textarea {
       width: 100%;
       height: 220px;
-      margin: 0 auto 20px auto;
-      display: block;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      padding: 10px;
+      margin-bottom: 25px;
+      border: 2px solid #e1e5e9;
+      border-radius: 12px;
+      padding: 20px;
       resize: vertical;
-      font-family: monospace;
-      box-sizing: border-box;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      transition: all 0.3s ease;
+      background: #fff;
     }
 
-    input.text-input {
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .progress-section {
+      background: #fff;
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .progress-container {
       width: 100%;
-      margin: 0 auto 20px auto;
-      display: block;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      padding: 10px;
-      box-sizing: border-box;
+      background-color: #f0f2f5;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 15px;
+      height: 12px;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.3s ease;
+      border-radius: 12px;
+      position: relative;
+    }
+
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%);
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    #progressText {
+      text-align: center;
+      font-weight: 600;
+      color: #667eea;
+      font-size: 16px;
+    }
+
+    .table-container {
+      background: #fff;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      overflow-x: auto;
     }
 
     table {
-      border-collapse: collapse;
       width: 100%;
-      margin-top: 20px;
+      border-collapse: separate;
+      border-spacing: 0;
       background-color: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
     }
 
-    th, td {
-      border: 1px solid #e0e0e0;
-      padding: 8px 10px;
+    th,
+    td {
+      padding: 16px 20px;
       text-align: left;
+      border-bottom: 1px solid #f0f2f5;
     }
 
     th {
-      background-color: #f5f5f5;
-      font-weight: 600;
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      font-weight: 700;
+      color: #495057;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    tbody tr:nth-child(odd) {
-      background-color: #fafafa;
+    tbody tr {
+      transition: all 0.3s ease;
     }
 
     tbody tr:hover {
-      background-color: #f0f8ff;
+      background-color: #f8f9ff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     }
 
-    button.btn {
-      padding: 10px 16px;
-      margin-bottom: 20px;
-      cursor: pointer;
-      background-color: #007bff;
-      border: none;
-      color: #fff;
-      font-size: 16px;
-      border-radius: 4px;
-      transition: background-color 0.2s ease-in-out;
+    tbody tr:last-child td {
+      border-bottom: none;
     }
 
-    button.btn:hover {
-      background-color: #0056b3;
+    .loading {
+      position: relative;
+      color: #667eea;
+      font-weight: 600;
     }
 
-    #progress {
-      margin-bottom: 10px;
-      font-weight: bold;
-    }
-    .progress-container {
-      width: 100%;
-      background-color: #e5e5e5;
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-    .progress-bar {
-      width: 0;
-      height: 8px;
-      background-color: #007bff;
-      transition: width 0.3s ease;
-    }
-    .loading:after {
+    .loading::after {
       content: "";
       display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 2px solid #ccc;
-      border-top-color: #007bff;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e1e5e9;
+      border-top-color: #667eea;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin-left: 5px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+      margin-left: 8px;
+      vertical-align: middle;
     }
 
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+    }
+
+    .status-badge:hover {
+      transform: scale(1.05);
+    }
+
+    .status-success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status-warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+
+    .status-error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .section-title {
+      margin-bottom: 20px;
+      color: #495057;
+      font-size: 1.2rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .container {
+        margin: 10px;
+        padding: 20px;
+        border-radius: 16px;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .button-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      button.btn {
+        width: 100%;
+        margin-bottom: 10px;
+        min-width: auto;
+      }
+
+      .control-panel,
+      .progress-section,
+      .table-container {
+        padding: 20px;
+      }
+
+      table {
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 12px 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+
+      .header h1 {
+        font-size: 1.8rem;
+      }
+
+      .header p {
+        font-size: 1rem;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <button type="button" class="btn" id="save">保存</button>
-    <input type="text" id="testPhone" class="text-input" placeholder="测试手机号，多个用逗号分隔" />
-    <button type="button" class="btn" id="sendTestSMS">发送测试短信</button>
-      <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
-      <p id="progressText"></p>
-    <textarea id="config" placeholder="每行格式：域名[:端口]|手机号1,手机号2"></textarea>
-    <div>
+    <div class="header">
+      <h1>SSL 证书监测</h1>
+      <p>轻松监控您的SSL证书状态，及时获得过期提醒</p>
+    </div>
+
+    <div class="control-panel">
+      <h3 class="section-title">配置管理</h3>
+      <textarea id="config"
+        placeholder="每行格式：域名[:端口]|手机号1,手机号2&#10;&#10;示例：&#10;example.com|13800138000,13900139000&#10;example.com:443|13800138000&#10;subdomain.example.com:8443|13800138000"></textarea>
+
+      <div class="button-group">
+        <button type="button" class="btn" id="save">💾 保存配置</button>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <h3 class="section-title">测试短信</h3>
+      <input type="text" id="testPhone" class="text-input" placeholder="测试手机号，多个用逗号分隔，如：13800138000,13900139000" />
+      <div class="button-group">
+        <button type="button" class="btn" id="sendTestSMS">📱 发送测试短信</button>
+      </div>
+    </div>
+
+    <div class="progress-section">
+      <h3 class="section-title">检测进度</h3>
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <p id="progressText">等待开始检测...</p>
+    </div>
+
+    <div class="table-container">
+      <h3 class="section-title">证书状态</h3>
       <table>
         <thead>
           <tr>
-            <th>域名</th>
-            <th>起效时间</th>
-            <th>到期时间</th>
-            <th>到期天数</th>
-            <th>通知手机号</th>
+            <th>🌐 域名</th>
+            <th>📅 起效时间</th>
+            <th>⏰ 到期时间</th>
+            <th>⚠️ 剩余天数</th>
+            <th>📞 通知手机号</th>
           </tr>
         </thead>
-        <tbody id="tbody"><tr><td colspan="5">加载中...</td></tr></tbody>
+        <tbody id="tbody">
+          <tr>
+            <td colspan="5" class="empty-state">
+              <span class="loading">正在加载配置</span>
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
   </div>
@@ -246,18 +585,22 @@
             const tr = document.getElementById(rowId)
             if (code === 1) {
               const { valid_from, valid_to, days } = result
+              let statusClass = 'status-success'
+              if (days <= 7) statusClass = 'status-error'
+              else if (days <= 30) statusClass = 'status-warning'
+
               tr.innerHTML = `
                 <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
                 <td>${new Date(valid_from).Format('yyyy-MM-dd HH:mm:ss')}</td>
                 <td>${new Date(valid_to).Format('yyyy-MM-dd HH:mm:ss')}</td>
-                <td>${days}</td>
+                <td><span class="status-badge ${statusClass}">${days} 天</span></td>
                 <td>${phoneList.join(', ')}</td>
               `
             } else {
               tr.innerHTML = `
                 <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                <td colspan="2">请求失败：${msg}</td>
-                <td> - </td>
+                <td colspan="2"><span style="color: #dc3545;">请求失败：${msg}</span></td>
+                <td><span class="status-badge status-error">失败</span></td>
                 <td>${phoneList.join(', ')}</td>
               `
             }
@@ -265,8 +608,8 @@
             const tr = document.getElementById(rowId)
             tr.innerHTML = `
               <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-              <td colspan="2">请求失败：网络错误</td>
-              <td> - </td>
+              <td colspan="2"><span style="color: #dc3545;">请求失败：网络错误</span></td>
+              <td><span class="status-badge status-error">失败</span></td>
               <td>${phoneList.join(', ')}</td>
             `
           }).finally(updateProgress)
@@ -274,9 +617,13 @@
       })
     }
     const setConfig = () => {
+      const saveBtn = document.getElementById('save')
+      const originalText = saveBtn.textContent
+      saveBtn.textContent = '💫 保存中...'
+      saveBtn.disabled = true
+
       fetch("/api/config", {
         method: "POST",
-        // mode: 'cors',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -285,9 +632,19 @@
         })
       }).then(response => response.json()).then(json => {
         if (json.code === 1) {
-          alert('保存成功')
-          window.location.reload()
-        } else alert('保存失败:', json.msg)
+          saveBtn.textContent = '✅ 保存成功'
+          setTimeout(() => {
+            window.location.reload()
+          }, 1000)
+        } else {
+          alert('保存失败:' + json.msg)
+          saveBtn.textContent = originalText
+          saveBtn.disabled = false
+        }
+      }).catch(err => {
+        alert('保存失败：网络错误')
+        saveBtn.textContent = originalText
+        saveBtn.disabled = false
       })
     }
 
@@ -297,6 +654,12 @@
         alert('请输入测试手机号')
         return
       }
+
+      const smsBtn = document.getElementById('sendTestSMS')
+      const originalText = smsBtn.textContent
+      smsBtn.textContent = '📤 发送中...'
+      smsBtn.disabled = true
+
       const phones = phoneStr.split(',').map(p => p.trim()).filter(p => p)
       fetch('/api/testSMS', {
         method: 'POST',
@@ -304,10 +667,20 @@
         body: JSON.stringify({ phones })
       }).then(response => response.json()).then(json => {
         if (json.code === 1) {
-          alert('发送成功')
+          smsBtn.textContent = '✅ 发送成功'
+          setTimeout(() => {
+            smsBtn.textContent = originalText
+            smsBtn.disabled = false
+          }, 2000)
         } else {
           alert('发送失败:' + json.msg)
+          smsBtn.textContent = originalText
+          smsBtn.disabled = false
         }
+      }).catch(err => {
+        alert('发送失败：网络错误')
+        smsBtn.textContent = originalText
+        smsBtn.disabled = false
       })
     }
 
