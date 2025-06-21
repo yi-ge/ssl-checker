@@ -188,6 +188,19 @@ fastify.after(() => {
       return { code: -1, msg: err.message }
     }
   })
+
+  fastify.post('/api/testSMS', async (req, reply) => {
+    const { phones } = req.body
+    if (!Array.isArray(phones) || phones.length === 0) {
+      return { code: -2, msg: '手机号不能为空' }
+    }
+    try {
+      const result = await sendSMS(phones, { host: 'test', day: 0 })
+      return { code: 1, result }
+    } catch (err) {
+      return { code: -1, msg: err.message }
+    }
+  })
 })
 
 schedule.scheduleJob('0 0 * * *', async function () {
