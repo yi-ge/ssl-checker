@@ -193,11 +193,12 @@ fastify.after(() => {
 schedule.scheduleJob('0 0 * * *', async function () {
   try {
     const lines = fs.readFileSync(path.join(__dirname, 'config.txt'), 'utf8').split('\n')
+    const tasks = []
 
     for (const line of lines) {
       let trimmedLine = line.trim()
       if (trimmedLine.includes('//')) {
-        trimmedLine = trimmedLine.split('//')[0] // 移除注释
+        trimmedLine = trimmedLine.split('//')[0]
       }
 
       if (trimmedLine) {
@@ -206,24 +207,27 @@ schedule.scheduleJob('0 0 * * *', async function () {
           const phoneList = phones.split(',').map(phone => phone.trim()).filter(phone => phone)
           const [host, port] = hostStr.split(':')
 
-          try {
-            const { valid_from, valid_to, days } = await cachedCheckerSSLCertificate(host.trim(), port ? parseInt(port) : 443)
-            if (days < 3) {
-              console.log(`SSL certificate for ${host} expires in ${days} days`)
-              console.log(await sendSMS(phoneList, {
-                host: host.replace(/\./g, '-').substring(0, 15),
-                day: days
-              }))
+          tasks.push((async () => {
+            try {
+              const { valid_from, valid_to, days } = await cachedCheckerSSLCertificate(host.trim(), port ? parseInt(port) : 443)
+              if (days < 3) {
+                console.log(`SSL certificate for ${host} expires in ${days} days`)
+                console.log(await sendSMS(phoneList, {
+                  host: host.replace(/\./g, '-').substring(0, 15),
+                  day: days
+                }))
+              }
+            } catch (err) {
+              console.error(`Failed to check SSL for ${host}:${port || 443} - ${err.message}`)
             }
-          } catch (err) {
-            console.error(`Failed to check SSL for ${host}:${port || 443} - ${err.message}`)
-            // Continue to next domain
-          }
+          })())
         } else {
           console.error(`Invalid line in config.txt: ${line}`)
         }
       }
     }
+
+    await Promise.allSettled(tasks)
   } catch (err) {
     console.error('Failed to read config.txt:', err.message)
   }
