@@ -67,6 +67,42 @@ req.end()
 
 2022年02月08日更新：支持添加注释，优化空格检测，支持不填写手机号。
 
+## 配置与部署
+
+自 `v1.1.0` 起，所有凭证与可调参数均通过**环境变量**配置，仓库中不再保留任何硬编码密钥。
+
+1. 复制示例配置并按需填写：
+
+```bash
+cp .env.example .env
+# 编辑 .env，至少填写 AUTH_USERNAME / AUTH_PASSWORD（强口令）
+```
+
+2. 安装依赖并启动：
+
+```bash
+pnpm install   # 或 npm install
+node main.js   # 或 pnpm start
+```
+
+> 未设置 `AUTH_USERNAME` / `AUTH_PASSWORD` 时程序会**拒绝启动**，避免裸奔。
+
+### 环境变量一览
+
+| 变量 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `AUTH_USERNAME` | ✅ | — | Basic Auth 用户名 |
+| `AUTH_PASSWORD` | ✅ | — | Basic Auth 密码（请用强口令） |
+| `PORT` | | `9000` | 监听端口 |
+| `HOST` | | `0.0.0.0` | 监听地址（建议生产仅监听 `127.0.0.1` + 反向代理） |
+| `CHECK_CRON` | | `0 0 * * *` | 定时巡检 cron 表达式 |
+| `WARN_DAYS` | | `3` | 剩余天数低于此值时短信告警 |
+| `REQUEST_TIMEOUT` | | `5000` | 单次 TLS 请求超时（毫秒） |
+| `MAX_RETRIES` | | `5` | 单域名最大重试次数 |
+| `SMS_BASE_URL` `SMS_TEMPLATE_ID` `SMS_APPID` `SMS_APPKEY` `SMS_AUTH` `SMS_TYPE` `SMS_TIMEOUT` | | — | 短信服务配置；不配置则仅记录日志、不发短信 |
+
+使用 PM2 部署时，`.env` 会被自动加载（`dotenv`），亦可在 `ecosystem.config.js` 的 `env` 字段中注入。
+
 ## 开源仓库地址
 
 [https://github.com/yi-ge/ssl-checker](https://github.com/yi-ge/ssl-checker)
