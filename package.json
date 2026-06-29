@@ -10,7 +10,6 @@
     "start": "node main.js"
   },
   "dependencies": {
-    "@fastify/basic-auth": "^5.1.1",
     "axios": "^1.6.2",
     "dotenv": "^16.4.5",
     "fastify": "^4.24.3",
