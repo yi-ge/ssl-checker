@@ -27,12 +27,28 @@ const MAX_RETRIES = parseIntegerEnv('MAX_RETRIES', 5, 1)
 
 const CACHE_FILE = path.join(__dirname, 'ssl_cache.json')
 const CONFIG_FILE = path.join(__dirname, 'config.txt')
+const SMS_CONFIG_FILE = path.join(__dirname, 'sms_config.json')
 const INDEX_FILE = path.join(__dirname, 'index.html')
 const LOGIN_FILE = path.join(__dirname, 'login.html')
 const CACHE_EXPIRATION_SUCCESS = 5 * 60 * 1000 // 成功结果缓存 5 分钟
 const CACHE_EXPIRATION_ERROR = 1 * 60 * 1000 // 错误结果缓存 1 分钟
 const SESSION_COOKIE_NAME = 'ssl_checker_session'
 const DAY_MS = 24 * 60 * 60 * 1000
+const SMS_SECRET_PLACEHOLDER = '********'
+const SMS_CONFIG_FIELDS = [
+  'enabled',
+  'provider',
+  'baseURL',
+  'endpoint',
+  'templateId',
+  'appid',
+  'appkey',
+  'type',
+  'auth',
+  'appUUID',
+  'timeout'
+]
+const SMS_SECRET_FIELDS = ['appkey', 'auth']
 
 // ===== 启动前置校验：缺少鉴权凭证则拒绝启动（避免裸奔） =====
 if (!USERNAME || !PASSWORD) {
@@ -181,6 +197,135 @@ function stripPhoneComment (value) {
   const text = String(value || '').trim()
   const commentIndex = text.indexOf('//')
   return commentIndex === -1 ? text : text.slice(0, commentIndex).trim()
+}
+
+function hasOwn (target, key) {
+  return Object.prototype.hasOwnProperty.call(target, key)
+}
+
+function readSmsConfigFromDisk () {
+  try {
+    const raw = fs.readFileSync(SMS_CONFIG_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {}
+  } catch (err) {
+    return {}
+  }
+}
+
+function mergeSmsConfig (base, override) {
+  const merged = { ...base }
+  for (const field of SMS_CONFIG_FIELDS) {
+    if (!hasOwn(override, field)) continue
+    const value = override[field]
+    if (SMS_SECRET_FIELDS.includes(field) && (!value || value === SMS_SECRET_PLACEHOLDER)) continue
+    merged[field] = value
+  }
+  return sendSMS.normalizeConfig(merged)
+}
+
+function getEffectiveSmsConfig () {
+  return mergeSmsConfig(sendSMS.getEnvConfig(), readSmsConfigFromDisk())
+}
+
+function validateSmsConfigForSave (config) {
+  if (config.baseURL) {
+    let parsedURL
+    try {
+      parsedURL = new URL(config.baseURL)
+    } catch (err) {
+      throw new Error('短信服务 Base URL 必须是有效的 HTTP/HTTPS 地址')
+    }
+
+    if (!['http:', 'https:'].includes(parsedURL.protocol)) {
+      throw new Error('短信服务 Base URL 仅支持 HTTP/HTTPS')
+    }
+  }
+
+  if (config.endpoint && !config.endpoint.startsWith('/')) {
+    throw new Error('短信服务接口路径必须以 / 开头')
+  }
+
+  if (config.provider && !/^[a-zA-Z0-9_-]+$/.test(config.provider)) {
+    throw new Error('供应商标识只能包含字母、数字、下划线或中划线')
+  }
+
+  if (config.type && !/^[a-zA-Z0-9_-]+$/.test(config.type)) {
+    throw new Error('短信类型只能包含字母、数字、下划线或中划线')
+  }
+
+  if (config.appUUID && !/^[a-zA-Z0-9_.-]+$/.test(config.appUUID)) {
+    throw new Error('应用标识只能包含字母、数字、点、下划线或中划线')
+  }
+
+  if (!Number.isInteger(config.timeout) || config.timeout <= 0) {
+    throw new Error('短信接口超时必须是正整数')
+  }
+}
+
+function normalizeSmsConfigForSave (input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('短信配置格式错误')
+  }
+
+  const current = readSmsConfigFromDisk()
+  const next = {}
+  for (const field of SMS_CONFIG_FIELDS) {
+    if (hasOwn(current, field)) next[field] = current[field]
+  }
+
+  if (hasOwn(input, 'enabled')) {
+    next.enabled = !(input.enabled === false || input.enabled === 'false' || input.enabled === '0')
+  }
+
+  for (const field of ['provider', 'baseURL', 'endpoint', 'templateId', 'appid', 'type', 'appUUID']) {
+    if (!hasOwn(input, field)) continue
+    next[field] = typeof input[field] === 'string' ? input[field].trim() : ''
+  }
+
+  for (const field of SMS_SECRET_FIELDS) {
+    if (!hasOwn(input, field)) continue
+    const value = typeof input[field] === 'string' ? input[field].trim() : ''
+    if (value && value !== SMS_SECRET_PLACEHOLDER) next[field] = value
+  }
+
+  if (hasOwn(input, 'timeout')) {
+    const timeout = parseInt(input.timeout, 10)
+    if (!Number.isInteger(timeout) || timeout <= 0) {
+      throw new Error('短信接口超时必须是正整数')
+    }
+    next.timeout = timeout
+  }
+
+  const normalized = sendSMS.normalizeConfig(next)
+  validateSmsConfigForSave(normalized)
+
+  for (const field of SMS_SECRET_FIELDS) {
+    if (!normalized[field]) delete normalized[field]
+  }
+  return normalized
+}
+
+function writeSmsConfigToDisk (config) {
+  const tmp = `${SMS_CONFIG_FILE}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + os.EOL, {
+    encoding: 'utf8',
+    mode: 0o600
+  })
+  fs.renameSync(tmp, SMS_CONFIG_FILE)
+}
+
+function getSmsConfigStatus () {
+  const config = getEffectiveSmsConfig()
+  return {
+    configured: sendSMS.hasRequiredConfig(config),
+    missingFields: sendSMS.getMissingFields(config),
+    config: {
+      ...config,
+      appkey: config.appkey ? SMS_SECRET_PLACEHOLDER : '',
+      auth: config.auth ? SMS_SECRET_PLACEHOLDER : ''
+    }
+  }
 }
 
 // 校验并归一化端口。parseInt 会接受 "443abc"，这里必须严格拒绝。
@@ -654,6 +799,29 @@ fastify.post('/api/config', { preHandler: requireAuth }, (req, reply) => {
   }
 })
 
+fastify.get('/api/sms-config', { preHandler: requireAuth }, (req, reply) => {
+  return { code: 1, result: getSmsConfigStatus() }
+})
+
+fastify.post('/api/sms-config', { preHandler: requireAuth }, (req, reply) => {
+  const input = req.body && req.body.config
+  let config
+  try {
+    config = normalizeSmsConfigForSave(input)
+  } catch (err) {
+    reply.code(400)
+    return { code: -2, msg: err.message }
+  }
+
+  try {
+    writeSmsConfigToDisk(config)
+    return { code: 1, result: getSmsConfigStatus() }
+  } catch (err) {
+    reply.code(500)
+    return { code: -1, msg: '写入短信配置异常' }
+  }
+})
+
 fastify.get('/api/checkerSSLCertificate', { preHandler: requireAuth }, async (req, reply) => {
   let target
   try {
@@ -695,7 +863,7 @@ fastify.post('/api/testSMS', { preHandler: requireAuth }, async (req, reply) => 
     return { code: -2, msg: '手机号不能为空' }
   }
   try {
-    const result = await sendSMS(phones, { host: 'test', day: 0 })
+    const result = await sendSMS(phones, { host: 'test', day: 0 }, { config: getEffectiveSmsConfig() })
     return { code: 1, result }
   } catch (err) {
     return { code: -1, msg: err.message }
@@ -739,6 +907,7 @@ async function runScheduledCheck () {
   }
 
   const entries = parseConfigLines(raw)
+  const smsConfig = getEffectiveSmsConfig()
   await Promise.allSettled(entries.map(async ({ host, port, phoneList }) => {
     const target = formatTarget(host, port)
     try {
@@ -754,7 +923,7 @@ async function runScheduledCheck () {
           const smsResult = await sendSMS(phoneList, {
             host: host.replace(/\./g, '-').substring(0, 15),
             day: days
-          })
+          }, { config: smsConfig })
           fastify.log.info(`SMS sent for ${target}: ${JSON.stringify(smsResult)}`)
         } catch (smsErr) {
           fastify.log.error(`Failed to send SMS for ${target}: ${smsErr.message}`)

@@ -111,4 +111,5 @@ test.js
 
 # Runtime cache（运行时生成的证书缓存）
 ssl_cache.json
+sms_config.json
 *.tmp

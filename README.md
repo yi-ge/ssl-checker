@@ -66,6 +66,7 @@ const socket = tls.connect(
 ## 配置与部署
 
 自 `v1.1.0` 起，所有凭证与可调参数均通过**环境变量**配置，仓库中不再保留任何硬编码密钥。
+短信供应商也可以登录后台后在「短信供应商」面板中可视化配置，运行时配置会保存到 `sms_config.json`，并覆盖同名环境变量；密钥字段在页面回显时会被掩码处理。
 
 1. 复制示例配置并按需填写：
 
@@ -98,7 +99,10 @@ node main.js   # 或 pnpm start
 | `WARN_DAYS` | | `3` | 剩余天数低于此值时短信告警 |
 | `REQUEST_TIMEOUT` | | `5000` | 单次 TLS 请求超时（毫秒） |
 | `MAX_RETRIES` | | `5` | 单域名最大重试次数 |
-| `SMS_BASE_URL` `SMS_TEMPLATE_ID` `SMS_APPID` `SMS_APPKEY` `SMS_AUTH` `SMS_TYPE` `SMS_TIMEOUT` | | — | 短信服务配置；不配置则仅记录日志、不发短信 |
+| `SMS_ENABLED` | | `true` | 是否启用短信告警 |
+| `SMS_PROVIDER` | | `submail` | 短信供应商标识，用于界面展示和默认短信类型 |
+| `SMS_BASE_URL` `SMS_ENDPOINT` | | `/sendSMS` | 短信服务地址与接口路径 |
+| `SMS_TEMPLATE_ID` `SMS_APPID` `SMS_APPKEY` `SMS_AUTH` `SMS_APP_UUID` `SMS_TYPE` `SMS_TIMEOUT` | | `SMS_APP_UUID=test` `SMS_TYPE=submail` `SMS_TIMEOUT=10000` | 短信服务配置；不配置完整则仅记录日志、不发短信 |
 
 使用 PM2 部署时，`.env` 会被自动加载（`dotenv`），亦可在 `ecosystem.config.js` 的 `env` 字段中注入。
 

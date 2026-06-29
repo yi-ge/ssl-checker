@@ -158,6 +158,10 @@
       background: linear-gradient(135deg, #f093fb, #f5576c);
     }
 
+    #saveSmsConfig {
+      background: linear-gradient(135deg, #20c997, #0d6efd);
+    }
+
     #logout {
       min-width: auto;
       padding: 10px 16px;
@@ -165,7 +169,8 @@
       background: linear-gradient(135deg, #495057, #212529);
     }
 
-    input.text-input {
+    input.text-input,
+    select.text-input {
       width: 100%;
       margin-bottom: 25px;
       border: 2px solid #e1e5e9;
@@ -176,11 +181,88 @@
       background: #fff;
     }
 
-    input.text-input:focus {
+    select.text-input {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #6c757d 50%), linear-gradient(135deg, #6c757d 50%, transparent 50%);
+      background-position: calc(100% - 22px) 50%, calc(100% - 16px) 50%;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    input.text-input:focus,
+    select.text-input:focus {
       outline: none;
       border-color: #667eea;
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
       transform: translateY(-1px);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px 20px;
+      margin-bottom: 25px;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      color: #495057;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .field .text-input {
+      margin-bottom: 0;
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #495057;
+      font-weight: 700;
+      padding: 12px 0;
+    }
+
+    .checkbox-field input {
+      width: 18px;
+      height: 18px;
+      accent-color: #20c997;
+    }
+
+    .sms-status {
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .sms-status-success {
+      color: #0f5132;
+      background: #d1e7dd;
+      border-color: #badbcc;
+    }
+
+    .sms-status-warning {
+      color: #664d03;
+      background: #fff3cd;
+      border-color: #ffecb5;
+    }
+
+    .sms-status-muted {
+      color: #495057;
+      background: #f1f3f5;
+      border-color: #dee2e6;
     }
 
     textarea {
@@ -429,6 +511,10 @@
         align-items: stretch;
       }
 
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
       button.btn {
         width: 100%;
         margin-bottom: 10px;
@@ -490,6 +576,77 @@
 
       <div class="button-group">
         <button type="button" class="btn" id="save">💾 保存配置</button>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <h3 class="section-title">短信供应商</h3>
+      <div id="smsStatus" class="sms-status sms-status-muted">正在读取短信配置...</div>
+
+      <div class="form-grid">
+        <label class="checkbox-field field full" for="smsEnabled">
+          <input type="checkbox" id="smsEnabled" checked />
+          <span>启用短信告警</span>
+        </label>
+
+        <div class="field">
+          <label for="smsProvider">供应商</label>
+          <select id="smsProvider" class="text-input">
+            <option value="submail">Submail</option>
+            <option value="tencent">腾讯云</option>
+            <option value="aliyun">阿里云</option>
+            <option value="custom">自定义</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="smsType">短信类型</label>
+          <input type="text" id="smsType" class="text-input" placeholder="submail" />
+        </div>
+
+        <div class="field full">
+          <label for="smsBaseURL">服务地址</label>
+          <input type="url" id="smsBaseURL" class="text-input" placeholder="https://sms.example.com" />
+        </div>
+
+        <div class="field">
+          <label for="smsEndpoint">接口路径</label>
+          <input type="text" id="smsEndpoint" class="text-input" placeholder="/sendSMS" />
+        </div>
+
+        <div class="field">
+          <label for="smsTemplateId">模板 ID</label>
+          <input type="text" id="smsTemplateId" class="text-input" placeholder="template-id" />
+        </div>
+
+        <div class="field">
+          <label for="smsAppid">App ID</label>
+          <input type="text" id="smsAppid" class="text-input" placeholder="appid" />
+        </div>
+
+        <div class="field">
+          <label for="smsAppUUID">App UUID</label>
+          <input type="text" id="smsAppUUID" class="text-input" placeholder="test" />
+        </div>
+
+        <div class="field">
+          <label for="smsAppkey">App Key</label>
+          <input type="password" id="smsAppkey" class="text-input" autocomplete="new-password" placeholder="留空保留现有密钥" />
+        </div>
+
+        <div class="field">
+          <label for="smsAuth">Auth Token</label>
+          <input type="password" id="smsAuth" class="text-input" autocomplete="new-password" placeholder="留空保留现有密钥" />
+        </div>
+
+        <div class="field">
+          <label for="smsTimeout">超时毫秒</label>
+          <input type="number" id="smsTimeout" class="text-input" min="1" step="500" placeholder="10000" />
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn" id="saveSmsConfig">💾 保存短信配置</button>
       </div>
     </div>
 
@@ -688,6 +845,140 @@
         }))
         return json
       })
+    }
+
+    const SMS_SECRET_PLACEHOLDER = '********'
+    const SMS_FIELD_LABELS = {
+      baseURL: '服务地址',
+      templateId: '模板 ID',
+      appid: 'App ID',
+      appkey: 'App Key',
+      auth: 'Auth Token'
+    }
+
+    const setSmsStatus = (status) => {
+      const smsStatus = document.getElementById('smsStatus')
+      smsStatus.className = 'sms-status'
+
+      const config = status.config || {}
+      if (config.enabled === false) {
+        smsStatus.classList.add('sms-status-muted')
+        smsStatus.textContent = '短信告警已禁用'
+        return
+      }
+
+      if (status.configured) {
+        smsStatus.classList.add('sms-status-success')
+        smsStatus.textContent = '短信供应商配置完整，可发送告警短信'
+        return
+      }
+
+      const missingFields = (status.missingFields || []).map(field => SMS_FIELD_LABELS[field] || field)
+      smsStatus.classList.add('sms-status-warning')
+      smsStatus.textContent = missingFields.length
+        ? `短信配置未完成：缺少 ${missingFields.join('、')}`
+        : '短信配置未完成'
+    }
+
+    const setSmsProviderValue = (value) => {
+      const providerSelect = document.getElementById('smsProvider')
+      const exists = Array.from(providerSelect.options).some(option => option.value === value)
+      providerSelect.value = exists ? value : 'custom'
+    }
+
+    const fillSmsConfigForm = (config) => {
+      document.getElementById('smsEnabled').checked = config.enabled !== false
+      setSmsProviderValue(config.provider || 'submail')
+      document.getElementById('smsType').value = config.type || config.provider || 'submail'
+      document.getElementById('smsBaseURL').value = config.baseURL || ''
+      document.getElementById('smsEndpoint').value = config.endpoint || '/sendSMS'
+      document.getElementById('smsTemplateId').value = config.templateId || ''
+      document.getElementById('smsAppid').value = config.appid || ''
+      document.getElementById('smsAppUUID').value = config.appUUID || 'test'
+      document.getElementById('smsAppkey').value = config.appkey === SMS_SECRET_PLACEHOLDER ? SMS_SECRET_PLACEHOLDER : ''
+      document.getElementById('smsAuth').value = config.auth === SMS_SECRET_PLACEHOLDER ? SMS_SECRET_PLACEHOLDER : ''
+      document.getElementById('smsTimeout').value = config.timeout || 10000
+    }
+
+    const getSmsConfig = () => {
+      apiFetch('/api/sms-config', {
+        method: 'GET',
+      }).then(response => response.json()).then(json => {
+        if (json.code !== 1) {
+          alert('获取短信配置失败:' + json.msg)
+          return
+        }
+
+        fillSmsConfigForm(json.result.config || {})
+        setSmsStatus(json.result)
+      }).catch(err => {
+        if (err.message === SESSION_EXPIRED) return
+        const smsStatus = document.getElementById('smsStatus')
+        smsStatus.className = 'sms-status sms-status-warning'
+        smsStatus.textContent = '获取短信配置失败'
+      })
+    }
+
+    const getSmsFormData = () => {
+      const provider = document.getElementById('smsProvider').value
+      return {
+        enabled: document.getElementById('smsEnabled').checked,
+        provider,
+        baseURL: document.getElementById('smsBaseURL').value.trim(),
+        endpoint: document.getElementById('smsEndpoint').value.trim() || '/sendSMS',
+        templateId: document.getElementById('smsTemplateId').value.trim(),
+        appid: document.getElementById('smsAppid').value.trim(),
+        appkey: document.getElementById('smsAppkey').value.trim(),
+        type: document.getElementById('smsType').value.trim() || provider,
+        auth: document.getElementById('smsAuth').value.trim(),
+        appUUID: document.getElementById('smsAppUUID').value.trim() || 'test',
+        timeout: document.getElementById('smsTimeout').value.trim() || '10000'
+      }
+    }
+
+    const saveSmsConfig = () => {
+      const saveBtn = document.getElementById('saveSmsConfig')
+      const originalText = saveBtn.textContent
+      saveBtn.textContent = '💫 保存中...'
+      saveBtn.disabled = true
+
+      apiFetch('/api/sms-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          config: getSmsFormData()
+        })
+      }).then(response => response.json()).then(json => {
+        if (json.code === 1) {
+          fillSmsConfigForm(json.result.config || {})
+          setSmsStatus(json.result)
+          saveBtn.textContent = '✅ 保存成功'
+          setTimeout(() => {
+            saveBtn.textContent = originalText
+            saveBtn.disabled = false
+          }, 1500)
+        } else {
+          alert('保存短信配置失败:' + json.msg)
+          saveBtn.textContent = originalText
+          saveBtn.disabled = false
+        }
+      }).catch(err => {
+        if (err.message === SESSION_EXPIRED) return
+        alert('保存短信配置失败：网络错误')
+        saveBtn.textContent = originalText
+        saveBtn.disabled = false
+      })
+    }
+
+    const syncSmsTypeWithProvider = () => {
+      const provider = document.getElementById('smsProvider').value
+      const smsType = document.getElementById('smsType')
+      const knownTypes = ['submail', 'tencent', 'aliyun', 'custom']
+      if (!smsType.value.trim() || knownTypes.includes(smsType.value.trim())) {
+        smsType.value = provider === 'custom' ? '' : provider
+      }
     }
 
     const getConfig = () => {
@@ -895,8 +1186,11 @@
 
     window.onload = function () {
       document.getElementById('save').onclick = setConfig
+      document.getElementById('saveSmsConfig').onclick = saveSmsConfig
+      document.getElementById('smsProvider').onchange = syncSmsTypeWithProvider
       document.getElementById('sendTestSMS').onclick = sendTestSMS
       document.getElementById('logout').onclick = logout
+      getSmsConfig()
       getConfig()
     }
   </script>
