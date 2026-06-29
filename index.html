@@ -369,6 +369,30 @@
       border: 1px solid #f5c6cb;
     }
 
+    .target-cell {
+      font-weight: 600;
+      color: #212529;
+      word-break: break-all;
+    }
+
+    .error-text {
+      color: #dc3545;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .error-detail {
+      margin-top: 4px;
+      color: #6c757d;
+      font-size: 12px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .muted-text {
+      color: #6c757d;
+    }
+
     .section-title {
       margin-bottom: 20px;
       color: #495057;
@@ -543,21 +567,122 @@
       })
     }
 
-    const checkerSSLCertificate = (host, port = 443) => {
-      return new Promise((resolve, reject) => {
-        if (!port || isNaN(parseFloat(port)) || !isFinite(port)) {
-          reject(new Error('Invalid host or port'))
-        }
+    const escapeHtml = value => String(value === undefined || value === null ? '' : value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char])
 
-        apiFetch(`/api/checkerSSLCertificate?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`, {
-          method: "GET",
-          // mode: 'cors',
-        }).then(response => response.json()).then(json => {
-          resolve(json)
-        }).catch(error => reject(error))
-      })
+    const stripInlineComment = line => {
+      const trimmed = String(line || '').trim()
+      if (trimmed.startsWith('//')) return ''
+
+      const match = trimmed.match(/\s+\/\//)
+      if (!match) return trimmed
+      return trimmed.slice(0, match.index).trim()
     }
 
+    const normalizePortInput = (value, fallback = 443) => {
+      if (value === undefined || value === null || value === '') return fallback
+
+      const raw = String(value).trim()
+      if (!/^\d+$/.test(raw)) {
+        throw new Error(`端口格式不正确：${raw}。请输入 1-65535 之间的整数。`)
+      }
+
+      const port = Number(raw)
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`端口超出范围：${raw}。请输入 1-65535 之间的整数。`)
+      }
+      return port
+    }
+
+    const normalizeTargetInput = targetText => {
+      const raw = String(targetText || '').trim()
+      if (!raw) throw new Error('目标地址不能为空。请输入域名或 IP，例如 example.com 或 example.com:443。')
+
+      const bracketMatch = raw.match(/^\[([^\]]+)](?::(.+))?$/)
+      if (bracketMatch) {
+        return {
+          host: bracketMatch[1].trim(),
+          port: normalizePortInput(bracketMatch[2])
+        }
+      }
+
+      const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+      const hasPathLikePart = /[/?#]/.test(raw)
+      if (hasProtocol || hasPathLikePart) {
+        let parsed
+        try {
+          parsed = new URL(hasProtocol ? raw : `https://${raw}`)
+        } catch (err) {
+          throw new Error(`目标地址格式不正确：${raw}。请输入域名、域名:端口 或 https:// 域名。`)
+        }
+
+        if (parsed.protocol && parsed.protocol !== 'https:') {
+          throw new Error(`暂不支持 ${parsed.protocol} 地址。SSL 检测目标应为 HTTPS/TLS 服务。`)
+        }
+
+        return {
+          host: parsed.hostname.replace(/^\[|\]$/g, ''),
+          port: normalizePortInput(parsed.port)
+        }
+      }
+
+      const colonCount = (raw.match(/:/g) || []).length
+      let host = raw
+      let port = 443
+      if (colonCount === 1) {
+        const parts = raw.split(':')
+        host = parts[0]
+        port = normalizePortInput(parts[1])
+      }
+
+      host = host.trim().replace(/^\[|\]$/g, '').replace(/\.$/, '')
+      if (!host || /[\s\\]/.test(host)) {
+        throw new Error(`域名格式不正确：${raw}。请检查是否包含空格、路径或非法字符。`)
+      }
+
+      return { host, port }
+    }
+
+    const formatTargetLabel = target => {
+      const host = target.host.includes(':') ? `[${target.host}]` : target.host
+      return target.port === 443 ? host : `${host}:${target.port}`
+    }
+
+    const formatDate = value => {
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return escapeHtml(value)
+      return date.Format('yyyy-MM-dd HH:mm:ss')
+    }
+
+    const renderErrorRow = (tr, targetLabel, message, phoneList, detail = '', badge = '失败') => {
+      tr.innerHTML = `
+        <td class="target-cell">${escapeHtml(targetLabel)}</td>
+        <td colspan="2">
+          <div class="error-text">${escapeHtml(message)}</div>
+          ${detail ? `<div class="error-detail">技术细节：${escapeHtml(detail)}</div>` : ''}
+        </td>
+        <td><span class="status-badge status-error">${escapeHtml(badge)}</span></td>
+        <td>${escapeHtml(phoneList.join(', ')) || '<span class="muted-text">未配置</span>'}</td>
+      `
+    }
+
+    const checkerSSLCertificate = target => {
+      return apiFetch(`/api/checkerSSLCertificate?host=${encodeURIComponent(target.host)}&port=${encodeURIComponent(target.port)}`, {
+        method: "GET",
+        // mode: 'cors',
+      }).then(async response => {
+        const json = await response.json().catch(() => ({
+          code: -1,
+          msg: `服务器返回了非 JSON 响应（HTTP ${response.status}）`
+        }))
+        return json
+      })
+    }
 
     const getConfig = () => {
       apiFetch('/api/config', {
@@ -574,37 +699,67 @@
         const progressBar = document.getElementById('progressBar')
         const tbody = document.getElementById('tbody')
         tbody.innerHTML = ''
+        progressBar.style.width = '0%'
         let total = 0
         let finished = 0
+        let successCount = 0
+        let failureCount = 0
+        let invalidCount = 0
         const domains = []
 
-        for (const lineRaw of lines) {
-          let line = lineRaw
-          if (line.trim().includes('//')) {
-            line = line.split('//')[0]
+        lines.forEach((lineRaw, index) => {
+          const line = stripInlineComment(lineRaw)
+          if (!line.trim()) return
+
+          const separatorIndex = line.indexOf('|')
+          const targetText = separatorIndex === -1 ? line : line.slice(0, separatorIndex).trim()
+          const phoneText = separatorIndex === -1 ? '' : line.slice(separatorIndex + 1).trim()
+          const phoneList = phoneText ? phoneText.split(',').map(p => p.trim()).filter(p => p) : []
+
+          let target
+          let targetLabel
+          try {
+            target = normalizeTargetInput(targetText)
+            targetLabel = formatTargetLabel(target)
+          } catch (err) {
+            invalidCount++
+            const tr = document.createElement('tr')
+            renderErrorRow(
+              tr,
+              `第 ${index + 1} 行`,
+              `配置格式错误：${err.message}`,
+              phoneList,
+              lineRaw,
+              '配置错误'
+            )
+            tbody.appendChild(tr)
+            return
           }
-          if (!line.trim()) continue
 
-          const [hostStr, phones] = line.split('|')
-          if (!hostStr || !hostStr.trim()) continue
-
-          const phoneList = phones && phones.split ? phones.split(',').map(p => p.trim()) : []
-          const [host, port] = hostStr.trim().split(':')
           total++
           const rowId = 'row-' + total
           const tr = document.createElement('tr')
           tr.id = rowId
           tr.innerHTML = `
-            <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
+            <td class="target-cell">${escapeHtml(targetLabel)}</td>
             <td colspan="3"><span class="loading">检测中</span></td>
-            <td>${phoneList.join(', ')}</td>
+            <td>${escapeHtml(phoneList.join(', ')) || '<span class="muted-text">未配置</span>'}</td>
           `
           tbody.appendChild(tr)
-          domains.push({ host, port, phoneList, rowId })
-        }
+          domains.push({ target, targetLabel, phoneList, rowId })
+        })
 
         if (total === 0) {
-          progressText.textContent = '未检测到域名'
+          progressText.textContent = invalidCount > 0
+            ? `没有可检测的域名，已发现 ${invalidCount} 行配置问题`
+            : '未检测到域名'
+          if (invalidCount === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="5" class="empty-state">暂无配置</td>
+              </tr>
+            `
+          }
           return
         }
 
@@ -615,43 +770,37 @@
           progressText.textContent = `检测进度：${finished}/${total}`
           progressBar.style.width = (finished / total * 100) + '%'
           if (finished === total) {
-            progressText.textContent = '检测完成'
+            const suffix = invalidCount > 0 ? `，配置问题 ${invalidCount} 行` : ''
+            progressText.textContent = `检测完成：成功 ${successCount} 个，失败 ${failureCount} 个${suffix}`
           }
         }
 
-        domains.forEach(({ host, port, phoneList, rowId }) => {
-          checkerSSLCertificate(host, port).then(({ code, msg, result }) => {
+        domains.forEach(({ target, targetLabel, phoneList, rowId }) => {
+          checkerSSLCertificate(target).then(({ code, msg, result, error }) => {
             const tr = document.getElementById(rowId)
             if (code === 1) {
               const { valid_from, valid_to, days } = result
               let statusClass = 'status-success'
               if (days <= 7) statusClass = 'status-error'
               else if (days <= 30) statusClass = 'status-warning'
+              successCount++
 
               tr.innerHTML = `
-                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                <td>${new Date(valid_from).Format('yyyy-MM-dd HH:mm:ss')}</td>
-                <td>${new Date(valid_to).Format('yyyy-MM-dd HH:mm:ss')}</td>
+                <td class="target-cell">${escapeHtml(targetLabel)}</td>
+                <td>${formatDate(valid_from)}</td>
+                <td>${formatDate(valid_to)}</td>
                 <td><span class="status-badge ${statusClass}">${days} 天</span></td>
-                <td>${phoneList.join(', ')}</td>
+                <td>${escapeHtml(phoneList.join(', ')) || '<span class="muted-text">未配置</span>'}</td>
               `
             } else {
-              tr.innerHTML = `
-                <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-                <td colspan="2"><span style="color: #dc3545;">请求失败：${msg}</span></td>
-                <td><span class="status-badge status-error">失败</span></td>
-                <td>${phoneList.join(', ')}</td>
-              `
+              failureCount++
+              renderErrorRow(tr, targetLabel, msg || '检测失败', phoneList, error && error.detail)
             }
           }).catch(err => {
             if (err.message === SESSION_EXPIRED) return
+            failureCount++
             const tr = document.getElementById(rowId)
-            tr.innerHTML = `
-              <td>${host}${port && port !== '443' ? ':' + port : ''}</td>
-              <td colspan="2"><span style="color: #dc3545;">请求失败：网络错误</span></td>
-              <td><span class="status-badge status-error">失败</span></td>
-              <td>${phoneList.join(', ')}</td>
-            `
+            renderErrorRow(tr, targetLabel, '请求失败：网络错误，请检查服务端是否可用。', phoneList, err.message)
           }).finally(updateProgress)
         })
       }).catch(err => {

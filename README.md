@@ -15,7 +15,7 @@
 1. 以简单的 js 脚本在 node.js 平台实现程序，利用现成的[node-schedule](https://github.com/node-schedule/node-schedule)库实现定时任务。
 2. 通过`axios`调用第三方接口实现短信发送，参数为`手机号数组`+`域名`+`即将过期天数/-过期天数`。
 3. 通过 HTML + JS 实现通知列表的可视化维护，通过登录页和签名会话 Cookie 进行身份认证。需要一个 Web 服务器实现服务器端向客户端输出 HTML 数据和 HTTP API，选择方便快捷的`fastify`。
-4. 通过 Node.js 的[https](https://nodejs.org/api/https.html)相关 API 实现对证书信息的获取。
+4. 通过 Node.js 的[tls](https://nodejs.org/api/tls.html)相关 API 直接进行 TLS 握手并获取证书信息。
 
 ## 实现
 
@@ -28,27 +28,23 @@ yarn add node-schedule axios fastify
 获取某个域名的 SSL 证书信息：
 
 ```javascript
-const https = require('https')
+const tls = require('tls')
 
-const req = https.request(
+const socket = tls.connect(
   {
     host: 'www.wyr.me',
     port: 443,
-    method: 'GET',
+    servername: 'www.wyr.me',
     rejectUnauthorized: false,
-    agent: new https.Agent({
-      maxCachedSessions: 0,
-    }),
   },
-  (res) => {
-    console.log(res.connection.getPeerCertificate())
-  }
+  () => {
+    console.log(socket.getPeerCertificate())
+    socket.end()
+  },
 )
-
-req.end()
 ```
 
-其中，`agent: new https.Agent({ maxCachedSessions: 0 })`是必须的，否则第二次请求的时候将无法获得证书信息。
+直接通过 TLS 握手获取证书，不依赖目标站点是否能正常返回 HTTP 响应，也能更准确地区分 DNS 解析失败、连接超时、端口拒绝连接、非 TLS 服务等错误。
 
 短信模板：
 

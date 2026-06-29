@@ -14,7 +14,7 @@
   - `/api/config` – 获取或更新 `config.txt` 内容
   - `/api/checkerSSLCertificate` – 查询指定域名和端口的证书信息
 - 使用 **node-schedule** 每日检查 `config.txt` 中的域名
-- 通过 Node 的 `https` 模块获取证书并缓存到 `ssl_cache.json`
+- 通过 Node 的 `tls` 模块直接握手获取证书并缓存到 `ssl_cache.json`
 - 当证书距离过期不足三天时，触发 `sendSMS()` 发送提醒
 
 ### 短信发送模块 (`sendSMS.js`)
@@ -31,11 +31,11 @@
 - **凭证与会话比较**：登录凭证与会话签名使用 `crypto.timingSafeEqual` 恒定时间比较，规避时序侧信道
 - **会话保护**：登录成功后下发 httpOnly、SameSite=Lax 的签名 Cookie，过期或签名非法时拒绝访问受保护接口
 - **缓存**：内存优先 + 临时文件 `rename` 原子落盘，合并并发写入，规避读改写丢失与文件损坏
-- **输入校验**：API 对 host/port 做合法性校验
+- **输入校验与错误提示**：API 统一解析域名、URL、端口和注释，并将 DNS、超时、连接拒绝、非 TLS 服务等底层错误归一化为可操作提示
 - **优雅退出**：`SIGINT`/`SIGTERM` 时取消定时任务、落盘缓存、关闭服务器
 
 ### 配置文件 (`config.txt`)
-- 文本格式，每行 `域名[:端口]|手机号1,手机号2`
+- 文本格式，每行 `域名[:端口]|手机号1,手机号2`，手机号可为空；未配置手机号时仍会检测，只跳过短信发送
 - 支持使用 `//` 添加注释
 
 ### 前端页面 (`login.html`、`index.html`)
