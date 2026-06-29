@@ -18,6 +18,7 @@ www.example.com|13800138000, 13800138001
 api.example.com:8443|13900139000
 status.example.com
 bad.example.com:abc|13600136000
+https://ssl.example.com/path|15887150449//腾讯云跳转到博客
 `)
 
   assert.deepEqual(tasks, [
@@ -38,6 +39,12 @@ bad.example.com:abc|13600136000
       port: 443,
       phoneList: [],
       line: 4
+    },
+    {
+      host: 'ssl.example.com',
+      port: 443,
+      phoneList: ['15887150449'],
+      line: 6
     }
   ])
 })
