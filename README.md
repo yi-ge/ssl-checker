@@ -14,7 +14,7 @@
 
 1. 以简单的 js 脚本在 node.js 平台实现程序，利用现成的[node-schedule](https://github.com/node-schedule/node-schedule)库实现定时任务。
 2. 通过`axios`调用第三方接口实现短信发送，参数为`手机号数组`+`域名`+`即将过期天数/-过期天数`。
-3. 通过 HTML + JS 实现通知列表的可视化维护，通过 Basic Auth 进行身份认证。需要一个 Web 服务器实现服务器端向客户端输出 HTML 数据和 HTTP API，选择方便快捷的`fastify`及其插件`fastify-basic-auth`。
+3. 通过 HTML + JS 实现通知列表的可视化维护，通过登录页和签名会话 Cookie 进行身份认证。需要一个 Web 服务器实现服务器端向客户端输出 HTML 数据和 HTTP API，选择方便快捷的`fastify`。
 4. 通过 Node.js 的[https](https://nodejs.org/api/https.html)相关 API 实现对证书信息的获取。
 
 ## 实现
@@ -22,7 +22,7 @@
 安装可能用到的依赖：
 
 ```bash
-yarn add node-schedule axios fastify fastify-basic-auth
+yarn add node-schedule axios fastify
 ```
 
 获取某个域名的 SSL 证书信息：
@@ -91,8 +91,11 @@ node main.js   # 或 pnpm start
 
 | 变量 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `AUTH_USERNAME` | ✅ | — | Basic Auth 用户名 |
-| `AUTH_PASSWORD` | ✅ | — | Basic Auth 密码（请用强口令） |
+| `AUTH_USERNAME` | ✅ | — | 登录用户名 |
+| `AUTH_PASSWORD` | ✅ | — | 登录密码（请用强口令） |
+| `AUTH_SESSION_SECRET` | | `AUTH_PASSWORD` | 登录会话签名密钥 |
+| `AUTH_SESSION_TTL_SECONDS` | | `86400` | 登录会话有效期（秒） |
+| `AUTH_COOKIE_SECURE` | | `false` | 是否为登录 Cookie 添加 `Secure` 标记；HTTPS 部署建议开启 |
 | `PORT` | | `9000` | 监听端口 |
 | `HOST` | | `0.0.0.0` | 监听地址（建议生产仅监听 `127.0.0.1` + 反向代理） |
 | `CHECK_CRON` | | `0 0 * * *` | 定时巡检 cron 表达式 |
