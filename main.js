@@ -177,6 +177,12 @@ function stripInlineComment (line) {
   return trimmed.slice(0, match.index).trim()
 }
 
+function stripPhoneComment (value) {
+  const text = String(value || '').trim()
+  const commentIndex = text.indexOf('//')
+  return commentIndex === -1 ? text : text.slice(0, commentIndex).trim()
+}
+
 // 校验并归一化端口。parseInt 会接受 "443abc"，这里必须严格拒绝。
 function normalizePort (value, fallback = 443) {
   if (value === undefined || value === null || value === '') return fallback
@@ -705,7 +711,7 @@ function parseConfigLines (raw) {
 
     const separatorIndex = line.indexOf('|')
     const targetText = separatorIndex === -1 ? line : line.slice(0, separatorIndex).trim()
-    const phoneText = separatorIndex === -1 ? '' : line.slice(separatorIndex + 1).trim()
+    const phoneText = separatorIndex === -1 ? '' : stripPhoneComment(line.slice(separatorIndex + 1))
 
     let target
     try {
