@@ -16,16 +16,14 @@ const schedule = require('node-schedule')
 const USERNAME = process.env.AUTH_USERNAME
 const PASSWORD = process.env.AUTH_PASSWORD
 const SESSION_SECRET = process.env.AUTH_SESSION_SECRET || PASSWORD
-const SESSION_TTL_SECONDS = process.env.AUTH_SESSION_TTL_SECONDS
-  ? parseInt(process.env.AUTH_SESSION_TTL_SECONDS, 10)
-  : 24 * 60 * 60
+const SESSION_TTL_SECONDS = parseIntegerEnv('AUTH_SESSION_TTL_SECONDS', 24 * 60 * 60, 1)
 const COOKIE_SECURE = process.env.AUTH_COOKIE_SECURE === 'true'
-const PORT = parseInt(process.env.PORT, 10) || 9000
+const PORT = parseIntegerEnv('PORT', 9000, 1, 65535)
 const HOST = process.env.HOST || '0.0.0.0'
 const CHECK_CRON = process.env.CHECK_CRON || '0 0 * * *' // 每天 0 点
-const WARN_DAYS = parseInt(process.env.WARN_DAYS, 10) || 3 // 剩余天数低于此值时告警
-const REQUEST_TIMEOUT = parseInt(process.env.REQUEST_TIMEOUT, 10) || 5000
-const MAX_RETRIES = parseInt(process.env.MAX_RETRIES, 10) || 5
+const WARN_DAYS = parseIntegerEnv('WARN_DAYS', 3, 0) // 剩余天数低于此值时告警
+const REQUEST_TIMEOUT = parseIntegerEnv('REQUEST_TIMEOUT', 5000, 1)
+const MAX_RETRIES = parseIntegerEnv('MAX_RETRIES', 5, 1)
 
 const CACHE_FILE = path.join(__dirname, 'ssl_cache.json')
 const CONFIG_FILE = path.join(__dirname, 'config.txt')
@@ -38,25 +36,29 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 // ===== 启动前置校验：缺少鉴权凭证则拒绝启动（避免裸奔） =====
 if (!USERNAME || !PASSWORD) {
-  console.error(
-    '[FATAL] 缺少鉴权环境变量 AUTH_USERNAME / AUTH_PASSWORD。\n' +
+  failFast(
+    '缺少鉴权环境变量 AUTH_USERNAME / AUTH_PASSWORD。\n' +
     '        请创建 .env 文件（可参考 .env.example）或通过环境变量注入后再启动。'
   )
-  process.exit(1)
-}
-
-// 端口范围校验
-if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
-  console.error(`[FATAL] 非法端口号: ${process.env.PORT}`)
-  process.exit(1)
-}
-
-if (!Number.isInteger(SESSION_TTL_SECONDS) || SESSION_TTL_SECONDS <= 0) {
-  console.error(`[FATAL] 非法登录会话有效期: ${process.env.AUTH_SESSION_TTL_SECONDS}`)
-  process.exit(1)
 }
 
 // ===== 工具函数 =====
+
+function failFast (message) {
+  console.error(`[FATAL] ${message}`)
+  process.exit(1)
+}
+
+function parseIntegerEnv (name, fallback, min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+
+  const value = Number(raw)
+  if (!Number.isInteger(value) || value < min || value > max) {
+    failFast(`非法环境变量 ${name}: ${raw}`)
+  }
+  return value
+}
 
 // 恒定时间比较，避免凭证与签名比较的时序侧信道泄露
 function safeEqual (a, b) {
@@ -758,11 +760,46 @@ async function runScheduledCheck () {
   }))
 }
 
-const scheduledJob = schedule.scheduleJob(CHECK_CRON, runScheduledCheck)
+let scheduledCheckRunning = false
+
+async function runScheduledCheckSafely () {
+  if (scheduledCheckRunning) {
+    fastify.log.warn('Previous scheduled SSL check is still running, skipping this run')
+    return
+  }
+
+  scheduledCheckRunning = true
+  try {
+    await runScheduledCheck()
+  } catch (err) {
+    fastify.log.error(`Scheduled SSL check failed unexpectedly: ${err.message}`)
+  } finally {
+    scheduledCheckRunning = false
+  }
+}
+
+let scheduledJob = null
+
+function startScheduler () {
+  if (scheduledJob) return scheduledJob
+
+  try {
+    scheduledJob = schedule.scheduleJob(CHECK_CRON, runScheduledCheckSafely)
+  } catch (err) {
+    failFast(`非法 CHECK_CRON: ${CHECK_CRON} (${err.message})`)
+  }
+
+  if (!scheduledJob) {
+    failFast(`非法 CHECK_CRON: ${CHECK_CRON}`)
+  }
+
+  return scheduledJob
+}
 
 // ===== 启动与优雅退出 =====
 const start = async () => {
   try {
+    startScheduler()
     await fastify.listen({ port: PORT, host: HOST })
   } catch (err) {
     fastify.log.error(err)
@@ -792,4 +829,15 @@ process.on('unhandledRejection', (reason) => {
   fastify.log.error(`Unhandled rejection: ${reason}`)
 })
 
-start()
+if (require.main === module) {
+  start()
+}
+
+module.exports = {
+  normalizePort,
+  normalizeTarget,
+  parseConfigLines,
+  runScheduledCheck,
+  runScheduledCheckSafely,
+  startScheduler
+}
