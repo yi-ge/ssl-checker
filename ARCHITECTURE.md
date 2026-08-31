@@ -24,6 +24,15 @@
 - 页面读取短信配置时会掩码返回 `appkey` 和 `auth`，避免密钥明文回显
 - 未配置短信时降级为「仅日志、不发送」，不影响证书检测主流程
 
+### 本地 MCP Server (`mcp/server.js`)
+- 使用官方 MCP TypeScript SDK 的 STDIO transport，只注册 `check_ssl_certificate` 一个只读工具
+- 与 Web 管理面、短信配置和定时任务隔离，不继承这些能力或凭证
+- `mcp/check-service.js` 强制执行域名和端口允许列表、DNS 后公网地址检查、连接地址固定、并发限制和每分钟限流
+- 默认拒绝所有域名；管理员必须通过 `SSL_MCP_ALLOWED_HOSTS` 显式授权
+- 证书检测核心位于 `lib/ssl-check.js`，由 Web 服务与 MCP 共同复用，避免两套 TLS 行为漂移
+- MCP 输出为有界结构化数据；证书 subject/issuer 始终视为外部不可信文本
+- 完整接入、配置和故障排查见 [`docs/MCP.md`](docs/MCP.md)
+
 ### 配置（环境变量）
 - 凭证与可调参数全部来自环境变量，通过 `dotenv` 从 `.env` 加载
 - 缺少 `AUTH_USERNAME` / `AUTH_PASSWORD` 时拒绝启动
@@ -36,6 +45,7 @@
 - **缓存**：内存优先 + 临时文件 `rename` 原子落盘，合并并发写入，规避读改写丢失与文件损坏
 - **输入校验与错误提示**：API 统一解析域名、URL、端口和注释，并将 DNS、超时、连接拒绝、非 TLS 服务等底层错误归一化为可操作提示
 - **优雅退出**：`SIGINT`/`SIGTERM` 时取消定时任务、落盘缓存、关闭服务器
+- **MCP 网络边界**：域名解析结果只要包含非公网地址就整体拒绝；TLS 连接固定到已校验 IP，同时保留原域名作为 SNI，防止 DNS rebinding
 
 ### 配置文件 (`config.txt`)
 - 文本格式，每行 `域名[:端口]|手机号1,手机号2`，手机号可为空；未配置手机号时仍会检测，只跳过短信发送

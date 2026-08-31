@@ -106,6 +106,45 @@ node main.js   # 或 pnpm start
 
 使用 PM2 部署时，`.env` 会被自动加载（`dotenv`），亦可在 `ecosystem.config.js` 的 `env` 字段中注入。
 
+## MCP：安全开放给本地 Agent
+
+项目提供一个独立的 STDIO MCP Server，只开放只读工具 `check_ssl_certificate`。它不会读取或修改监控列表、手机号、短信配置，也不会发送短信或控制定时任务。
+
+MCP 默认拒绝所有目标。启动前必须通过 `SSL_MCP_ALLOWED_HOSTS` 明确允许域名：
+
+```bash
+SSL_MCP_ALLOWED_HOSTS=example.com pnpm mcp
+```
+
+允许列表使用逗号分隔，支持精确域名、`*.example.com` 子域名通配和显式的 `*`。`*` 仍然只允许公网地址；本机、内网、链路本地、保留地址和云元数据地址会在 DNS 解析后被拒绝。默认只允许 443 端口。
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `SSL_MCP_ALLOWED_HOSTS` | — | 必填；允许检测的域名/IP 列表，未配置时所有调用失败关闭 |
+| `SSL_MCP_ALLOWED_PORTS` | `443` | 允许的 TLS 端口，逗号分隔 |
+| `SSL_MCP_TIMEOUT_MS` | `5000` | 单次 TLS 连接超时，范围 250-30000 ms |
+| `SSL_MCP_MAX_RETRIES` | `2` | 最大尝试次数，范围 1-3 |
+| `SSL_MCP_MAX_CONCURRENCY` | `4` | 最大并发检测数，范围 1-16 |
+| `SSL_MCP_MAX_REQUESTS_PER_MINUTE` | `30` | 进程级每分钟调用上限，范围 1-300 |
+
+Codex 项目级 `.codex/config.toml` 示例：
+
+```toml
+[mcp_servers.ssl_checker]
+command = "node"
+args = ["/absolute/path/to/ssl-checker/mcp/server.js"]
+cwd = "/absolute/path/to/ssl-checker"
+env = { SSL_MCP_ALLOWED_HOSTS = "example.com,*.example.org", SSL_MCP_ALLOWED_PORTS = "443" }
+enabled_tools = ["check_ssl_certificate"]
+default_tools_approval_mode = "prompt"
+startup_timeout_sec = 10
+tool_timeout_sec = 15
+```
+
+保存配置并重启 Codex 后，可使用 `/mcp` 检查连接状态。建议先保留逐次审批；确认允许列表和审计日志符合预期后，再按实际信任边界调整。
+
+工具返回的 `chainVerified` 表示 Node.js 是否信任证书链。仅仅成功取得证书元数据不代表证书可信，因此 Agent 不应只根据调用成功与否判断 TLS 安全。
+
 ## 开源仓库地址
 
 [https://github.com/yi-ge/ssl-checker](https://github.com/yi-ge/ssl-checker)
@@ -139,6 +178,7 @@ fastify.get('/api/config', (req, reply) => {
 
 ## 文档
 - [ARCHITECTURE.md](ARCHITECTURE.md)
+- [SSL Checker MCP 使用指南](docs/MCP.md)
 
 ## 相关博文
 
